@@ -18,18 +18,18 @@ optim_dict = {"SGD": optim.SGD}
 def image_classification_predict(loader, model, test_10crop=True, gpu=True):
     start_test = True
     if test_10crop:
-        iter_test = [iter(loader['test'+str(i)]) for i in xrange(10)]
-        for i in xrange(len(loader['test0'])):
-            data = [iter_test[j].next() for j in xrange(10)]
-            inputs = [data[j][0] for j in xrange(10)]
+        iter_test = [iter(loader['test'+str(i)]) for i in range(10)]
+        for i in range(len(loader['test0'])):
+            data = [iter_test[j].next() for j in range(10)]
+            inputs = [data[j][0] for j in range(10)]
             if gpu:
-                for j in xrange(10):
+                for j in range(10):
                     inputs[j] = Variable(inputs[j].cuda())
             else:
-                for j in xrange(10):
+                for j in range(10):
                     inputs[j] = Variable(inputs[j])
             outputs = []
-            for j in xrange(10):
+            for j in range(10):
                 outputs.append(model(inputs[j]))
             outputs = sum(outputs)
             if start_test:
@@ -39,7 +39,7 @@ def image_classification_predict(loader, model, test_10crop=True, gpu=True):
                 all_output = torch.cat((all_output, outputs.data.float()), 0)
     else:
         iter_val = iter(loader["test"])
-        for i in xrange(len(loader['test'])):
+        for i in range(len(loader['test'])):
             data = iter_val.next()
             inputs = data[0]
             if gpu:
@@ -58,21 +58,21 @@ def image_classification_predict(loader, model, test_10crop=True, gpu=True):
 def image_classification_test(loader, model, test_10crop=True, gpu=True):
     start_test = True
     if test_10crop:
-        iter_test = [iter(loader['test'+str(i)]) for i in xrange(10)]
-        for i in xrange(len(loader['test0'])):
-            data = [iter_test[j].next() for j in xrange(10)]
-            inputs = [data[j][0] for j in xrange(10)]
+        iter_test = [iter(loader['test'+str(i)]) for i in range(10)]
+        for i in range(len(loader['test0'])):
+            data = [iter_test[j].next() for j in range(10)]
+            inputs = [data[j][0] for j in range(10)]
             labels = data[0][1]
             if gpu:
-                for j in xrange(10):
+                for j in range(10):
                     inputs[j] = Variable(inputs[j].cuda())
                 labels = Variable(labels.cuda())
             else:
-                for j in xrange(10):
+                for j in range(10):
                     inputs[j] = Variable(inputs[j])
                 labels = Variable(labels)
             outputs = []
-            for j in xrange(10):
+            for j in range(10):
                 outputs.append(model(inputs[j]))
             outputs = sum(outputs)
             if start_test:
@@ -84,7 +84,7 @@ def image_classification_test(loader, model, test_10crop=True, gpu=True):
                 all_label = torch.cat((all_label, labels.data.float()), 0)
     else:
         iter_test = iter(loader["test"])
-        for i in xrange(len(loader["test"])):
+        for i in range(len(loader["test"])):
             data = iter_test.next()
             inputs = data[0]
             labels = data[1]
@@ -107,19 +107,17 @@ def image_classification_test(loader, model, test_10crop=True, gpu=True):
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).item() / float(all_label.size()[0])
     return accuracy
 
-
 def transfer_classification(config):
     ## set pre-process
     prep_dict = {}
     for prep_config in config["prep"]:
         prep_dict[prep_config["name"]] = {}
-        if prep_config["type"] == "image":
-            prep_dict[prep_config["name"]]["test_10crop"] = prep_config["test_10crop"]
-            prep_dict[prep_config["name"]]["train"]  = prep.image_train(resize_size=prep_config["resize_size"], crop_size=prep_config["crop_size"])
-            if prep_config["test_10crop"]:
-                prep_dict[prep_config["name"]]["test"] = prep.image_test_10crop(resize_size=prep_config["resize_size"], crop_size=prep_config["crop_size"])
-            else:
-                prep_dict[prep_config["name"]]["test"] = prep.image_test(resize_size=prep_config["resize_size"], crop_size=prep_config["crop_size"])
+        prep_dict[prep_config["name"]]["test_10crop"] = prep_config["test_10crop"]
+        prep_dict[prep_config["name"]]["train"]  = prep.image_train(resize_size=prep_config["resize_size"], crop_size=prep_config["crop_size"])
+        if prep_config["test_10crop"]:
+            prep_dict[prep_config["name"]]["test"] = prep.image_test_10crop(resize_size=prep_config["resize_size"], crop_size=prep_config["crop_size"])
+        else:
+            prep_dict[prep_config["name"]]["test"] = prep.image_test(resize_size=prep_config["resize_size"], crop_size=prep_config["crop_size"])
                
     ## set loss
     class_criterion = nn.CrossEntropyLoss()
@@ -141,8 +139,7 @@ def transfer_classification(config):
             if "test" in data_config["list_path"]:
                 if prep_dict[data_config["name"]]["test_10crop"]:
                     for i in range(10):
-                        dsets[data_config["name"]]["test"+str(i)] = ImageList(open(data_config["list_path"]["test"]).readlines(), transform=prep_dict[data_config["name"]]["test"]["val"+str(i)]
-)
+                        dsets[data_config["name"]]["test"+str(i)] = ImageList(open(data_config["list_path"]["test"]).readlines(), transform=prep_dict[data_config["name"]]["test"]["val"+str(i)])
                         dset_loaders[data_config["name"]]["test"+str(i)] = util_data.DataLoader(dsets[data_config["name"]]["test"+str(i)], batch_size=data_config["batch_size"]["test"], shuffle=False, num_workers=4)           
                 else:
                     dsets[data_config["name"]]["test"] = ImageList(open(data_config["list_path"]["test"]).readlines(), transform=prep_dict[data_config["name"]]["test"])  
@@ -211,7 +208,7 @@ def transfer_classification(config):
     ## train   
     len_train_source = len(dset_loaders["source"]["train"]) - 1
     len_train_target = len(dset_loaders["target"]["train"]) - 1
-    transfer_loss_value = classifier_loss_value = total_loss_value = 0.0
+    # transfer_loss_value = classifier_loss_value = total_loss_value = 0.0
     for i in range(config["num_iterations"]):
         ## test in the train
         if i % config["test_interval"] == 0:
@@ -219,10 +216,13 @@ def transfer_classification(config):
             classifier_layer.train(False)
             if net_config["use_bottleneck"]:
                 bottleneck_layer.train(False)
-                print image_classification_test(dset_loaders["target"], nn.Sequential(base_network, bottleneck_layer, classifier_layer), test_10crop=prep_dict["target"]["test_10crop"], gpu=use_gpu)
-
+                print(image_classification_test(dset_loaders["target"], 
+                                                nn.Sequential(base_network, bottleneck_layer, classifier_layer), 
+                                                test_10crop=prep_dict["target"]["test_10crop"], gpu=use_gpu))
             else:
-                print image_classification_test(dset_loaders["target"], nn.Sequential(base_network, classifier_layer), test_10crop=prep_dict["target"]["test_10crop"], gpu=use_gpu)
+                print(image_classification_test(dset_loaders["target"], 
+                                                nn.Sequential(base_network, classifier_layer), 
+                                                test_10crop=prep_dict["target"]["test_10crop"], gpu=use_gpu))
 
         loss_test = nn.BCELoss()
         ## train one iter
@@ -264,7 +264,6 @@ def transfer_classification(config):
         total_loss.backward()
         optimizer.step()
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer Learning')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
@@ -279,10 +278,15 @@ if __name__ == "__main__":
     config = {}
     config["num_iterations"] = 20000
     config["test_interval"] = 500
-    config["prep"] = [{"name":"source", "type":"image", "test_10crop":True, "resize_size":256, "crop_size":224}, {"name":"target", "type":"image", "test_10crop":True, "resize_size":256, "crop_size":224}]
+    config["prep"] = [{"name":"source", "type":"image", "test_10crop":True, "resize_size":256, "crop_size":224}, 
+                      {"name":"target", "type":"image", "test_10crop":True, "resize_size":256, "crop_size":224}]
     config["loss"] = {"name":args.loss_name, "trade_off":args.tradeoff }
-    config["data"] = [{"name":"source", "type":"image", "list_path":{"train":"../data/office/"+args.source+"_list.txt"}, "batch_size":{"train":36, "test":4} }, {"name":"target", "type":"image", "list_path":{"train":"../data/office/"+args.target+"_list.txt"}, "batch_size":{"train":36, "test":4} }]
+    config["data"] = [{"name":"source", "type":"image", "list_path":{"train":"../data/office/"+args.source+"_list.txt"}, "batch_size":{"train":36, "test":4}}, 
+                      {"name":"target", "type":"image", "list_path":{"train":"../data/office/"+args.target+"_list.txt"}, "batch_size":{"train":36, "test":4}}]
     config["network"] = {"name":"ResNet50", "use_bottleneck":args.using_bottleneck, "bottleneck_dim":256}
-    config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", "lr_param":{"init_lr":0.0003, "gamma":0.0003, "power":0.75} }
-    print config["loss"]
+    config["optimizer"] = {"type":"SGD", 
+                           "optim_params":{"lr":1.0, "momentum":0.9, "weight_decay":0.0005, "nesterov":True}, 
+                           "lr_type":"inv", 
+                           "lr_param":{"init_lr":0.0003, "gamma":0.0003, "power":0.75} }
+    print(config["loss"])
     transfer_classification(config)
