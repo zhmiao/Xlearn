@@ -56,8 +56,8 @@ class ForceFlip(object):
         return img.transpose(Image.FLIP_LEFT_RIGHT)
 
 def image_train(resize_size=256, crop_size=224):
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                    std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
+                                    std=[0.5, 0.5, 0.5])
     return  transforms.Compose([
             ResizeImage(resize_size),
             transforms.RandomResizedCrop(crop_size),
@@ -67,8 +67,8 @@ def image_train(resize_size=256, crop_size=224):
         ])
 
 def image_test(resize_size=256, crop_size=224):
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                   std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
+                                   std=[0.5, 0.5, 0.5])
     #ten crops for image when validation, input the data_transforms dictionary
     # start_first = 0
     start_center = (resize_size - crop_size - 1) / 2
