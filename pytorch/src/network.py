@@ -1,9 +1,85 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn import init
 import torchvision
 from torchvision import models
 from torch.autograd import Variable
+from torchvision.models.resnet import model_urls, BasicBlock, ResNet 
+
+
+class TaskNet(nn.Module):
+
+    num_channels = 3
+    image_size = 32
+    name = 'TaskNet'
+
+    "Basic class which does classification."
+    def __init__(self, num_cls=10, weights_init=None):
+        super(TaskNet, self).__init__()
+        self.num_cls = num_cls
+        self.setup_net()
+        self.criterion = nn.CrossEntropyLoss()
+        if weights_init is not None:
+            self.load(weights_init)
+        else:
+            init_weights(self)
+
+    def forward(self, x, with_ft=False):
+        x = self.conv_params(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc_params(x)
+        score = self.classifier(x)
+        if with_ft:
+            return score, x
+        else:
+            return score
+
+    def setup_net(self):
+        """Method to be implemented in each class."""
+        pass
+
+    def load(self, init_path):
+        net_init_dict = torch.load(init_path)
+        self.load_state_dict(net_init_dict)
+
+    def save(self, out_path):
+        torch.save(self.state_dict(), out_path)
+
+class DTNClassifier(TaskNet):
+    "Classifier used for SVHN source experiment"
+
+    num_channels = 3
+    image_size = 32
+    name = 'DTN'
+    out_dim = 512 # dim of last feature layer
+
+    def setup_net(self):
+        self.conv_params = nn.Sequential (
+                nn.Conv2d(self.num_channels, 64, kernel_size=5, stride=2, padding=2),
+                nn.BatchNorm2d(64),
+                nn.Dropout2d(0.1),
+                nn.ReLU(),
+                nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=2),
+                nn.BatchNorm2d(128),
+                nn.Dropout2d(0.3),
+                nn.ReLU(),
+                nn.Conv2d(128, 256, kernel_size=5, stride=2, padding=2),
+                nn.BatchNorm2d(256),
+                nn.Dropout2d(0.5),
+                nn.ReLU()
+                )
+    
+        self.fc_params = nn.Sequential (
+                nn.Linear(256*4*4, 512),
+                nn.BatchNorm1d(512),
+                )
+
+        self.classifier = nn.Sequential(
+                nn.ReLU(),
+                nn.Dropout(),
+                nn.Linear(512, self.num_cls)
+                )
 
 class SilenceLayer(torch.autograd.Function):
   def __init__(self):
@@ -14,31 +90,68 @@ class SilenceLayer(torch.autograd.Function):
   def backward(self, gradOutput):
     return 0 * gradOutput
 
+def init_weights(obj):
+    for m in obj.modules():
+        if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+            init.xavier_normal_(m.weight)
+            m.bias.data.zero_()
+        elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
+            m.reset_parameters()
 
 # convnet without the last layer
-class AlexNetFc(nn.Module):
-  def __init__(self):
-    super(AlexNetFc, self).__init__()
-    model_alexnet = models.alexnet(pretrained=True)
-    self.features = model_alexnet.features
-    self.classifier = nn.Sequential()
-    for i in xrange(6):
-      self.classifier.add_module("classifier"+str(i), model_alexnet.classifier[i])
-    self.__in_features = model_alexnet.classifier[6].in_features
-  
-  def forward(self, x):
-    x = self.features(x)
-    x = x.view(x.size(0), 256*6*6)
-    x = self.classifier(x)
-    return x
+class DTN(nn.Module):
+    def __init__(self, weights_init=None):
+        super(DTN, self).__init__()
+        self.setup_net()
+        self.criterion = nn.CrossEntropyLoss()
+        self.__in_features = 512
+        if weights_init is not None:
+            self.load(weights_init)
+        else:
+            init_weights(self)
 
-  def output_num(self):
-    return self.__in_features
+    def forward(self, x):
+        x = self.conv_params(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc_params(x)
+        return x
+        
+    def load(self, init_path):
+        net_init_dict = torch.load(init_path)
+        self.load_state_dict(net_init_dict)
+
+    def save(self, out_path):
+        torch.save(self.state_dict(), out_path)
+
+    def setup_net(self):
+        self.conv_params = nn.Sequential (
+                nn.Conv2d(3, 64, kernel_size=5, stride=2, padding=2),
+                nn.BatchNorm2d(64),
+                nn.Dropout2d(0.1),
+                nn.ReLU(),
+                nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=2),
+                nn.BatchNorm2d(128),
+                nn.Dropout2d(0.3),
+                nn.ReLU(),
+                nn.Conv2d(128, 256, kernel_size=5, stride=2, padding=2),
+                nn.BatchNorm2d(256),
+                nn.Dropout2d(0.5),
+                nn.ReLU()
+                )
+        self.fc_params = nn.Sequential (
+                nn.Linear(256*4*4, 512),
+                nn.BatchNorm1d(512),
+                nn.ReLU(),
+                nn.Dropout()
+                )
+
+    def output_num(self):
+        return self.__in_features
 
 class ResNet18Fc(nn.Module):
   def __init__(self):
     super(ResNet18Fc, self).__init__()
-    model_resnet18 = models.resnet18(pretrained=True)
+    model_resnet18 = models.resnet18(pretrained=False)
     self.conv1 = model_resnet18.conv1
     self.bn1 = model_resnet18.bn1
     self.relu = model_resnet18.relu
@@ -66,129 +179,25 @@ class ResNet18Fc(nn.Module):
   def output_num(self):
     return self.__in_features
 
-class ResNet34Fc(nn.Module):
-  def __init__(self):
-    super(ResNet34Fc, self).__init__()
-    model_resnet34 = models.resnet34(pretrained=True)
-    self.conv1 = model_resnet34.conv1
-    self.bn1 = model_resnet34.bn1
-    self.relu = model_resnet34.relu
-    self.maxpool = model_resnet34.maxpool
-    self.layer1 = model_resnet34.layer1
-    self.layer2 = model_resnet34.layer2
-    self.layer3 = model_resnet34.layer3
-    self.layer4 = model_resnet34.layer4
-    self.avgpool = model_resnet34.avgpool
-    self.__in_features = model_resnet34.fc.in_features
+class ResNet18_full(ResNet):
 
-  def forward(self, x):
-    x = self.conv1(x)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x = self.maxpool(x)
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
-    x = self.avgpool(x)
-    x = x.view(x.size(0), -1)
-    return x
+    num_channels = 3
+    image_size = 224
+    name = 'ResNet18'
+    out_dim = 512 # dim of last feature layer
 
-  def output_num(self):
-    return self.__in_features
+    def __init__(self, num_cls=6, weights_init=None):
+        super(ResNet18_full, self).__init__(BasicBlock, [2, 2, 2, 2], num_classes=num_cls)
+        self.criterion = nn.CrossEntropyLoss()
 
-class ResNet50Fc(nn.Module):
-  def __init__(self):
-    super(ResNet50Fc, self).__init__()
-    model_resnet50 = models.resnet50(pretrained=True)
-    self.conv1 = model_resnet50.conv1
-    self.bn1 = model_resnet50.bn1
-    self.relu = model_resnet50.relu
-    self.maxpool = model_resnet50.maxpool
-    self.layer1 = model_resnet50.layer1
-    self.layer2 = model_resnet50.layer2
-    self.layer3 = model_resnet50.layer3
-    self.layer4 = model_resnet50.layer4
-    self.avgpool = model_resnet50.avgpool
-    self.__in_features = model_resnet50.fc.in_features
+        if weights_init is not None:
+            self.load(weights_init)
 
-  def forward(self, x):
-    x = self.conv1(x)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x = self.maxpool(x)
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
-    x = self.avgpool(x)
-    x = x.view(x.size(0), -1)
-    return x
+    def load(self, init_path):
+        net_init_dict = torch.load(init_path)
+        self.load_state_dict(net_init_dict)
 
-  def output_num(self):
-    return self.__in_features
+    def save(self, out_path):
+        torch.save(self.state_dict(), out_path)
 
-class ResNet101Fc(nn.Module):
-  def __init__(self):
-    super(ResNet101Fc, self).__init__()
-    model_resnet101 = models.resnet101(pretrained=True)
-    self.conv1 = model_resnet101.conv1
-    self.bn1 = model_resnet101.bn1
-    self.relu = model_resnet101.relu
-    self.maxpool = model_resnet101.maxpool
-    self.layer1 = model_resnet101.layer1
-    self.layer2 = model_resnet101.layer2
-    self.layer3 = model_resnet101.layer3
-    self.layer4 = model_resnet101.layer4
-    self.avgpool = model_resnet101.avgpool
-    self.__in_features = model_resnet101.fc.in_features
-
-  def forward(self, x):
-    x = self.conv1(x)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x = self.maxpool(x)
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
-    x = self.avgpool(x)
-    x = x.view(x.size(0), -1)
-    return x
-
-  def output_num(self):
-    return self.__in_features
-
-
-class ResNet152Fc(nn.Module):
-  def __init__(self):
-    super(ResNet152Fc, self).__init__()
-    model_resnet152 = models.resnet152(pretrained=True)
-    self.conv1 = model_resnet152.conv1
-    self.bn1 = model_resnet152.bn1
-    self.relu = model_resnet152.relu
-    self.maxpool = model_resnet152.maxpool
-    self.layer1 = model_resnet152.layer1
-    self.layer2 = model_resnet152.layer2
-    self.layer3 = model_resnet152.layer3
-    self.layer4 = model_resnet152.layer4
-    self.avgpool = model_resnet152.avgpool
-    self.__in_features = model_resnet152.fc.in_features
-
-  def forward(self, x):
-    x = self.conv1(x)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x = self.maxpool(x)
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
-    x = self.avgpool(x)
-    x = x.view(x.size(0), -1)
-    return x
-
-  def output_num(self):
-    return self.__in_features
-
-network_dict = {"AlexNet":AlexNetFc, "ResNet18":ResNet18Fc, "ResNet34":ResNet34Fc, "ResNet50":ResNet50Fc, "ResNet101":ResNet101Fc, "ResNet152":ResNet152Fc}
+network_dict = {"DTN":DTN, "ResNet18":ResNet18Fc, "DTN_full": DTNClassifier, "ResNet18_full": ResNet18_full}

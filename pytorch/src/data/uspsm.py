@@ -37,11 +37,6 @@ download=False):
         else:
             self.txt = os.path.join(root, 'uspsm_test.txt')
 
-        print('Use %s'%self.txt)
-
-        # import pdb
-        # pdb.set_trace()
-
         self.img_path = []
         self.labels = []
         self.transform = transform
